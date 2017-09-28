@@ -15,7 +15,15 @@ namespace WebHdfs.Extensions.FileProviders
 
         public IDirectoryContents GetDirectoryContents(string subpath)
         {
-            throw new NotImplementedException();
+            var directoryInfo = new WebHdfsFileInfo(NameNodeUri, subpath);
+            if (directoryInfo.Exists && directoryInfo.IsDirectory)
+            {
+                return new WebHdfsDirectoryContents(directoryInfo);
+            }
+            else
+            {
+                return NotFoundDirectoryContents.Singleton;
+            }
         }
 
         public IFileInfo GetFileInfo(string subpath)

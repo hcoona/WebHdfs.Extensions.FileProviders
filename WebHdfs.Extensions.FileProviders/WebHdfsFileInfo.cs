@@ -12,6 +12,7 @@ namespace WebHdfs.Extensions.FileProviders
     {
         private readonly HttpClient httpClient;
         private readonly UriBuilder fileWebHdfsUriBuilder;
+        private readonly WebHdfsFileStatus fileStatus;
 
         public WebHdfsFileInfo(Uri nameNodeUri, string relativePath)
         {
@@ -23,21 +24,120 @@ namespace WebHdfs.Extensions.FileProviders
             try
             {
                 var statusObj = GetFileStatus().Result;
-                this.Exists = true;
-                this.Length = statusObj.FileStatus.length;
-                this.LastModified = FromUnixTimeMilliseconds((long)statusObj.FileStatus.modificationTime);
-                this.IsDirectory = string.Compare((string)statusObj.FileStatus.type, "DIRECTORY", StringComparison.CurrentCultureIgnoreCase) == 0;
+                Exists = true;
+                fileStatus = WebHdfsFileStatus.ParseJson(GetFileStatus().Result);
             }
             catch (AggregateException ex) when(ex.InnerException is FileNotFoundException)
             {
-                this.Exists = false;
-                this.Length = 0;
-                this.LastModified = new DateTimeOffset();
-                this.IsDirectory = false;
+                Exists = false;
+                fileStatus = new WebHdfsFileStatus();
             }
         }
-        
-        private DateTimeOffset FromUnixTimeMilliseconds(long milliseconds)
+
+        internal WebHdfsFileInfo(Uri nameNodeUri, string relativePath, WebHdfsFileStatus fileStatus)
+        {
+            this.NameNodeUri = nameNodeUri;
+            this.RelativePath = relativePath;
+            this.httpClient = new HttpClient();
+            this.fileWebHdfsUriBuilder = new UriBuilder(new Uri(NameNodeUri, $"/webhdfs/v1/{RelativePath.Trim('/')}"));
+
+            if (fileStatus == null)
+            {
+                this.Exists = false;
+                this.fileStatus = new WebHdfsFileStatus();
+            }
+            else
+            {
+                this.Exists = true;
+                this.fileStatus = fileStatus;
+            }
+        }
+
+        public Uri NameNodeUri { get; }
+
+        public string RelativePath { get; }
+
+        public bool Exists { get; }
+
+        public long Length => fileStatus.Length;
+
+        public string PhysicalPath => null;
+
+        public string Name => Path.GetFileName(RelativePath);
+
+        public DateTimeOffset LastModified => FromUnixTimeMilliseconds(fileStatus.ModificationTime);
+
+        public bool IsDirectory => fileStatus.Type == WebHdfsFileType.DIRECTORY;
+
+        public Stream CreateReadStream()
+        {
+            if (IsDirectory)
+            {
+                throw new InvalidOperationException("You cannot create read stream against a directory.");
+            }
+
+            fileWebHdfsUriBuilder.Query = "OP=OPEN";
+            return httpClient.GetStreamAsync(fileWebHdfsUriBuilder.Uri).Result;
+        }
+
+        public void Dispose()
+        {
+            httpClient.Dispose();
+        }
+
+        private async Task<string> GetFileStatus()
+        {
+            fileWebHdfsUriBuilder.Query = "OP=GETFILESTATUS";
+            var response = await httpClient.GetAsync(fileWebHdfsUriBuilder.Uri);
+
+            var responseContent = await response.Content.ReadAsStringAsync();
+            if (response.IsSuccessStatusCode)
+            {
+                return responseContent;
+            }
+            else
+            {
+                var responseContentObject = JsonConvert.DeserializeObject<dynamic>(responseContent);
+                string message = responseContentObject.RemoteException.message;
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.BadRequest: throw new ArgumentException(message);
+                    case HttpStatusCode.Unauthorized: throw new System.Security.SecurityException(message);
+                    case HttpStatusCode.Forbidden: throw new IOException(message);
+                    case HttpStatusCode.NotFound: throw new FileNotFoundException(message, Name);
+                    case HttpStatusCode.InternalServerError: throw new InvalidOperationException(message);
+                    default: throw new InvalidOperationException(message);
+                }
+            }
+        }
+
+        internal async Task<string> GetFileStatuses()
+        {
+            fileWebHdfsUriBuilder.Query = "OP=LISTSTATUS";
+            var response = await httpClient.GetAsync(fileWebHdfsUriBuilder.Uri);
+
+            var responseContent = await response.Content.ReadAsStringAsync();
+            if (response.IsSuccessStatusCode)
+            {
+                return responseContent;
+            }
+            else
+            {
+                var responseContentObject = JsonConvert.DeserializeObject<dynamic>(responseContent);
+                string message = responseContentObject.RemoteException.message;
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.BadRequest: throw new ArgumentException(message);
+                    case HttpStatusCode.Unauthorized: throw new System.Security.SecurityException(message);
+                    case HttpStatusCode.Forbidden: throw new IOException(message);
+                    case HttpStatusCode.NotFound: throw new FileNotFoundException(message, Name);
+                    case HttpStatusCode.InternalServerError: throw new InvalidOperationException(message);
+                    default: throw new InvalidOperationException(message);
+                }
+            }
+        }
+
+        private static DateTimeOffset FromUnixTimeMilliseconds(long milliseconds)
         {
 #if _NET462 || _NETSTANDARD2_0
             return DateTimeOffset.FromUnixTimeMilliseconds(milliseconds);
@@ -68,63 +168,6 @@ namespace WebHdfs.Extensions.FileProviders
             long ticks = milliseconds * TimeSpan.TicksPerMillisecond + UnixEpochTicks;
             return new DateTimeOffset(ticks, TimeSpan.Zero);
 #endif
-        }
-
-        public Uri NameNodeUri { get; }
-
-        public string RelativePath { get; }
-
-        private async Task<dynamic> GetFileStatus()
-        {
-            fileWebHdfsUriBuilder.Query = "OP=GETFILESTATUS";
-            var response = await httpClient.GetAsync(fileWebHdfsUriBuilder.Uri);
-
-            var responseContentObject = JsonConvert.DeserializeObject<dynamic>(await response.Content.ReadAsStringAsync());
-            if (response.IsSuccessStatusCode)
-            {
-                return responseContentObject;
-            }
-            else
-            {
-                string message = responseContentObject.RemoteException.message;
-                switch (response.StatusCode)
-                {
-                    case HttpStatusCode.BadRequest: throw new ArgumentException(message);
-                    case HttpStatusCode.Unauthorized: throw new System.Security.SecurityException(message);
-                    case HttpStatusCode.Forbidden: throw new IOException(message);
-                    case HttpStatusCode.NotFound: throw new FileNotFoundException(message, Name);
-                    case HttpStatusCode.InternalServerError: throw new InvalidOperationException(message);
-                    default: throw new InvalidOperationException(message);
-                }
-            }
-        }
-
-        public bool Exists { get; }
-
-        public long Length { get; }
-
-        public string PhysicalPath => null;
-
-        public string Name => Path.GetFileName(RelativePath);
-
-        public DateTimeOffset LastModified { get; }
-
-        public bool IsDirectory { get; }
-
-        public Stream CreateReadStream()
-        {
-            if (IsDirectory)
-            {
-                throw new InvalidOperationException("You cannot create read stream against a directory.");
-            }
-
-            fileWebHdfsUriBuilder.Query = "OP=OPEN";
-            return httpClient.GetStreamAsync(fileWebHdfsUriBuilder.Uri).Result;
-        }
-
-        public void Dispose()
-        {
-            httpClient.Dispose();
         }
     }
 }
