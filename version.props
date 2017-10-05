@@ -1,6 +1,5 @@
 <Project>
   <PropertyGroup>
-    <Version>0.2.0</Version>
     <Authors>Shuai Zhang</Authors>
     <Company>Shuai Zhang</Company>
     <Description>This is a file provider for HDFS through WebHDFS protocol for Microsoft.Extensions.FileProviders.</Description>
@@ -10,4 +9,8 @@
     <RepositoryUrl>https://github.com/hcoona/WebHdfs.Extensions.FileProviders</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Nerdbank.GitVersioning" Version="2.0.41" />
+  </ItemGroup>
 </Project>
