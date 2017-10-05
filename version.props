@@ -8,6 +8,7 @@
     <PackageProjectUrl>https://github.com/hcoona/WebHdfs.Extensions.FileProviders</PackageProjectUrl>
     <RepositoryUrl>https://github.com/hcoona/WebHdfs.Extensions.FileProviders</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
+    <PackageTags>hdfs webhdfs fileprovider filesystem</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
