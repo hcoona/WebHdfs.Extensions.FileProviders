@@ -7,11 +7,18 @@ namespace WebHdfs.Extensions.FileProviders
     public class WebHdfsFileProvider : IFileProvider
     {
         public WebHdfsFileProvider(Uri nameNodeUri)
+            : this(nameNodeUri, TimeSpan.FromSeconds(5))
+        { }
+
+        public WebHdfsFileProvider(Uri nameNodeUri, TimeSpan defaultPollingInterval)
         {
             this.NameNodeUri = nameNodeUri;
+            this.DefaultPollingInterval = defaultPollingInterval;
         }
 
         public Uri NameNodeUri { get; }
+
+        public TimeSpan DefaultPollingInterval { get; set; }
 
         public IDirectoryContents GetDirectoryContents(string subpath)
         {
@@ -33,7 +40,21 @@ namespace WebHdfs.Extensions.FileProviders
 
         public IChangeToken Watch(string filter)
         {
-            throw new NotImplementedException();
+            return Watch(filter, DefaultPollingInterval);
+        }
+
+        public IChangeToken Watch(string filter, TimeSpan pollingInterval)
+        {
+            if (filter.Contains("*"))
+            {
+                throw new NotImplementedException("Do not support watching glob filter for now.");
+            }
+            else
+            {
+                return new PollingFileChangeToken(
+                    (WebHdfsFileInfo)GetFileInfo(filter),
+                    pollingInterval);
+            }
         }
     }
 }

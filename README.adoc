@@ -44,9 +44,9 @@ dotnet build
 
 == Todo ==
 
-. Add CI for both Windows & Linux
-. Implement `Watch` function in `WebHdfsFileProvider`
 . Support OAuth
+. Support watch globbing files
+. Add CI for both Windows & Linux
 
 == License ==
 
