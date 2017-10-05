@@ -19,6 +19,8 @@ namespace WebHdfs.Extensions.FileProviders
                 FileStatus = new WebHdfsFileStatus()
             }).FileStatus;
         }
+
+        internal static WebHdfsFileStatus Empty { get; } = new WebHdfsFileStatus();
     }
 
     internal enum WebHdfsFileType

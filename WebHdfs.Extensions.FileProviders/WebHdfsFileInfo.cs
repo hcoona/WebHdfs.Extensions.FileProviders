@@ -12,7 +12,7 @@ namespace WebHdfs.Extensions.FileProviders
     {
         private readonly HttpClient httpClient;
         private readonly UriBuilder fileWebHdfsUriBuilder;
-        private readonly WebHdfsFileStatus fileStatus;
+        private WebHdfsFileStatus fileStatus;
 
         public WebHdfsFileInfo(Uri nameNodeUri, string relativePath)
         {
@@ -21,17 +21,7 @@ namespace WebHdfs.Extensions.FileProviders
             this.httpClient = new HttpClient();
             this.fileWebHdfsUriBuilder = new UriBuilder(new Uri(NameNodeUri, $"/webhdfs/v1/{RelativePath.Trim('/')}"));
 
-            try
-            {
-                var statusObj = GetFileStatus().Result;
-                Exists = true;
-                fileStatus = WebHdfsFileStatus.ParseJson(GetFileStatus().Result);
-            }
-            catch (AggregateException ex) when(ex.InnerException is FileNotFoundException)
-            {
-                Exists = false;
-                fileStatus = new WebHdfsFileStatus();
-            }
+            Refresh();
         }
 
         internal WebHdfsFileInfo(Uri nameNodeUri, string relativePath, WebHdfsFileStatus fileStatus)
@@ -41,23 +31,14 @@ namespace WebHdfs.Extensions.FileProviders
             this.httpClient = new HttpClient();
             this.fileWebHdfsUriBuilder = new UriBuilder(new Uri(NameNodeUri, $"/webhdfs/v1/{RelativePath.Trim('/')}"));
 
-            if (fileStatus == null)
-            {
-                this.Exists = false;
-                this.fileStatus = new WebHdfsFileStatus();
-            }
-            else
-            {
-                this.Exists = true;
-                this.fileStatus = fileStatus;
-            }
+            SetFileStatus(fileStatus);
         }
 
         public Uri NameNodeUri { get; }
 
         public string RelativePath { get; }
 
-        public bool Exists { get; }
+        public bool Exists { get; private set; }
 
         public long Length => fileStatus.Length;
 
@@ -78,6 +59,33 @@ namespace WebHdfs.Extensions.FileProviders
 
             fileWebHdfsUriBuilder.Query = "OP=OPEN";
             return httpClient.GetStreamAsync(fileWebHdfsUriBuilder.Uri).Result;
+        }
+
+        public void Refresh()
+        {
+            try
+            {
+                var statusObj = GetFileStatus().Result;
+                SetFileStatus(WebHdfsFileStatus.ParseJson(GetFileStatus().Result));
+            }
+            catch (AggregateException ex) when (ex.InnerException is FileNotFoundException)
+            {
+                SetFileStatus(null);
+            }
+        }
+
+        private void SetFileStatus(WebHdfsFileStatus fileStatus)
+        {
+            if (fileStatus == null || fileStatus == WebHdfsFileStatus.Empty)
+            {
+                Exists = false;
+                this.fileStatus = WebHdfsFileStatus.Empty;
+            }
+            else
+            {
+                Exists = true;
+                this.fileStatus = fileStatus;
+            }
         }
 
         public void Dispose()
