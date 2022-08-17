@@ -2,6 +2,8 @@
 
 This is a file provider for link:https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html[HDFS] through link:https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/WebHDFS.html[WebHDFS] protocol for link:https://github.com/aspnet/FileSystem[Microsoft.Extensions.FileProviders].
 
+*Moved to https://github.com/hcoona/OneDotNet/tree/1246c63/MicrosoftExtensions/FileProviders/WebHdfs*
+
 == Getting Started ==
 
 This project support .NET framework 4.5+ & .NET standard 1.1+
